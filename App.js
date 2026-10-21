@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 
 const SUPABASE_URL = 'https://nkczfvapwgmpmumfwses.supabase.co';
@@ -28,19 +27,23 @@ export default function App() {
     setError('');
 
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/products?select=id,name,description,price,category,stock,image_url&is_active=eq.true&order=id.asc`,
-        {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-        }
-      );
+      const url =
+        `${SUPABASE_URL}/rest/v1/products` +
+        '?select=id,name,description,price,category,stock,image_url' +
+        '&is_active=eq.true&order=id.asc';
+
+      const response = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
 
       if (!response.ok) {
         const details = await response.text();
-        throw new Error(`Supabase hatası (${response.status}): ${details}`);
+        throw new Error(
+          `Supabase hatası (${response.status}): ${details}`
+        );
       }
 
       const data = await response.json();
@@ -66,8 +69,10 @@ export default function App() {
       .toLocaleLowerCase('tr')
       .includes(search.toLocaleLowerCase('tr'));
 
-    return matchesSearch &&
-      (category === 'Tümü' || p.category === category);
+    const matchesCategory =
+      category === 'Tümü' || p.category === category;
+
+    return matchesSearch && matchesCategory;
   });
 
   const total = cart.reduce(
@@ -76,24 +81,28 @@ export default function App() {
   );
 
   function addToCart(product) {
-    if (product.stock < 1) {
-      Alert.alert('Stok yok', 'Bu ürün şu anda stokta yok.');
+    if (Number(product.stock) <= 0) {
+      setError(`${product.name} şu anda stokta yok.`);
       return;
     }
 
     setCart((current) => [...current, product]);
+    setError('');
   }
 
   function showCart() {
+    if (cart.length === 0) {
+      setError('Sepetin şu anda boş.');
+      return;
+    }
+
     const lines = cart.map(
-      (p) => `${p.name} — ${Number(p.price).toLocaleString('tr-TR')} TL`
+      (p) =>
+        `${p.name} — ${Number(p.price).toLocaleString('tr-TR')} TL`
     );
 
-    Alert.alert(
-      'Sepetim',
-      cart.length
-        ? `${lines.join('\n')}\n\nToplam: ${total.toLocaleString('tr-TR')} TL`
-        : 'Sepetin boş.'
+    setError(
+      `${lines.join(' | ')} | TOPLAM: ${total.toLocaleString('tr-TR')} TL`
     );
   }
 
@@ -105,12 +114,18 @@ export default function App() {
             <Text style={styles.logo}>BULZOVİK</Text>
             <Text style={styles.subtitle}>Aradığın burada.</Text>
           </View>
-          <TouchableOpacity style={styles.cartButton} onPress={showCart}>
+
+          <TouchableOpacity
+            style={styles.cartButton}
+            onPress={showCart}
+          >
             <Text style={styles.cartText}>🛒 {cart.length}</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.welcome}>Alışverişe hoş geldin!</Text>
+        <Text style={styles.welcome}>
+          Alışverişe hoş geldin!
+        </Text>
 
         <TextInput
           style={styles.search}
@@ -120,6 +135,7 @@ export default function App() {
         />
 
         <Text style={styles.sectionTitle}>Kategoriler</Text>
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {categories.map((item) => (
             <TouchableOpacity
@@ -144,25 +160,30 @@ export default function App() {
 
         <View style={styles.titleRow}>
           <Text style={styles.sectionTitle}>Ürünler</Text>
+
           <TouchableOpacity onPress={loadProducts}>
             <Text style={styles.refresh}>Yenile ↻</Text>
           </TouchableOpacity>
         </View>
 
-        {loading && <ActivityIndicator size="large" color="#171923" />}
+        {loading && (
+          <ActivityIndicator
+            size="large"
+            color="#171923"
+            style={styles.loader}
+          />
+        )}
 
         {!!error && (
           <View style={styles.errorBox}>
-            <Text style={styles.errorTitle}>Ürünler yüklenemedi</Text>
             <Text style={styles.error}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadProducts}>
-              <Text style={styles.retryText}>Tekrar dene</Text>
-            </TouchableOpacity>
           </View>
         )}
 
         {!loading && !error && products.length === 0 && (
-          <Text style={styles.empty}>Henüz ürün bulunamadı.</Text>
+          <Text style={styles.empty}>
+            Henüz aktif ürün bulunamadı.
+          </Text>
         )}
 
         <View style={styles.productGrid}>
@@ -177,36 +198,58 @@ export default function App() {
                   ? '🏠'
                   : '🛍️'}
               </Text>
+
               <Text style={styles.productName}>{p.name}</Text>
-              <Text style={styles.productCategory}>{p.category}</Text>
+              <Text style={styles.productCategory}>
+                {p.category}
+              </Text>
+
               <Text style={styles.price}>
                 {Number(p.price).toLocaleString('tr-TR')} TL
               </Text>
-              <Text style={styles.stock}>Stok: {p.stock}</Text>
+
+              <Text style={styles.stock}>
+                Stok: {p.stock}
+              </Text>
+
               <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => addToCart(p)}
               >
-                <Text style={styles.addButtonText}>Sepete Ekle</Text>
+                <Text style={styles.addButtonText}>
+                  Sepete Ekle
+                </Text>
               </TouchableOpacity>
             </View>
           ))}
         </View>
 
-        {!loading && !error && products.length > 0 &&
+        {!loading &&
+          !error &&
+          products.length > 0 &&
           filteredProducts.length === 0 && (
-            <Text style={styles.empty}>Uygun ürün bulunamadı.</Text>
+            <Text style={styles.empty}>
+              Aramana uygun ürün bulunamadı.
+            </Text>
           )}
 
-        <Text style={styles.footer}>BULZOVİK © 2026</Text>
+        <Text style={styles.footer}>
+          BULZOVİK © 2026
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F6FA' },
-  content: { padding: 18, paddingBottom: 35 },
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F6FA',
+  },
+  content: {
+    padding: 18,
+    paddingBottom: 35,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -221,13 +264,19 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1,
   },
-  subtitle: { color: '#CBD5E0', marginTop: 4 },
+  subtitle: {
+    color: '#CBD5E0',
+    marginTop: 4,
+  },
   cartButton: {
     backgroundColor: '#F6AD55',
     padding: 12,
     borderRadius: 12,
   },
-  cartText: { fontWeight: 'bold', fontSize: 16 },
+  cartText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
   welcome: {
     fontSize: 23,
     fontWeight: 'bold',
@@ -255,7 +304,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  refresh: { color: '#D97706', fontWeight: 'bold', marginTop: 10 },
+  refresh: {
+    color: '#D97706',
+    fontWeight: 'bold',
+    marginTop: 10,
+  },
+  loader: {
+    marginVertical: 25,
+  },
   category: {
     paddingVertical: 10,
     paddingHorizontal: 17,
@@ -265,9 +321,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  selectedCategory: { backgroundColor: '#171923', borderColor: '#171923' },
-  categoryText: { color: '#333333', fontWeight: '600' },
-  selectedCategoryText: { color: '#FFFFFF' },
+  selectedCategory: {
+    backgroundColor: '#171923',
+    borderColor: '#171923',
+  },
+  categoryText: {
+    color: '#333333',
+    fontWeight: '600',
+  },
+  selectedCategoryText: {
+    color: '#FFFFFF',
+  },
   productGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -293,7 +357,11 @@ const styles = StyleSheet.create({
     color: '#171923',
     minHeight: 36,
   },
-  productCategory: { color: '#718096', marginTop: 4, fontSize: 12 },
+  productCategory: {
+    color: '#718096',
+    marginTop: 4,
+    fontSize: 12,
+  },
   price: {
     fontSize: 17,
     fontWeight: 'bold',
@@ -301,30 +369,40 @@ const styles = StyleSheet.create({
     marginTop: 9,
     marginBottom: 8,
   },
-  stock: { color: '#718096', fontSize: 12, marginBottom: 10 },
+  stock: {
+    color: '#718096',
+    fontSize: 12,
+    marginBottom: 10,
+  },
   addButton: {
     backgroundColor: '#171923',
     padding: 10,
     borderRadius: 9,
     alignItems: 'center',
   },
-  addButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
-  empty: { textAlign: 'center', marginTop: 30, color: '#718096' },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  empty: {
+    textAlign: 'center',
+    marginTop: 30,
+    color: '#718096',
+  },
   errorBox: {
     backgroundColor: '#FEE2E2',
     padding: 14,
     borderRadius: 12,
     marginVertical: 14,
   },
-  errorTitle: { color: '#991B1B', fontWeight: 'bold', marginBottom: 6 },
-  error: { color: '#991B1B', fontSize: 12 },
-  retryButton: {
-    backgroundColor: '#171923',
-    padding: 11,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 12,
+  error: {
+    color: '#991B1B',
+    fontSize: 13,
   },
-  retryText: { color: '#FFFFFF', fontWeight: 'bold' },
-  footer: { textAlign: 'center', color: '#718096', marginTop: 28 },
+  footer: {
+    textAlign: 'center',
+    color: '#718096',
+    marginTop: 28,
+  },
 });
